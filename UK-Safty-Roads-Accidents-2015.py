@@ -1,6 +1,8 @@
 import csv,sqlite3
-from typing import Set
-from unicodedata import decimal
+import matplotlib.pyplot as plt
+import pandas as pd
+import seaborn as sns
+
 
 # Creacion de la base de datos
 conexion=sqlite3.connect("accidentes.db")
@@ -11,6 +13,7 @@ cursor.execute("DROP TABLE IF EXISTS TipoVehiculo")
 cursor.execute("DROP TABLE IF EXISTS Accidente")
 cursor.execute("DROP TABLE IF EXISTS MedianaAccidentes")
 cursor.execute("DROP TABLE IF EXISTS Vehiculo")
+cursor.execute("DROP TABLE IF EXISTS Resultados")
 
 # Creacion tablas
 cursor.execute(""" 
@@ -75,17 +78,35 @@ for elemento in lista:
 
 # Severidad y total de accidentes por tipo de vehiculo
 lista=cursor.execute('''SELECT Codigo FROM TipoVehiculo''').fetchall()
-
+# -----------
+instruccion=cursor.execute('''CREATE TABLE Resultados (
+    TipoVehiculo text,
+    PromedioSeverirad float,
+    TotalAccidentes interger
+) ''')
+# ----------
 def accidentes_Tipo_Vehiculo_Severeidad(n:list):
     for element in n:
         total_accidentes=cursor.execute('''SELECT TipoVehiculo FROM MedianaAccidentes WHERE Codigo={}'''.format(element[0])).fetchall()
         promedio=cursor.execute('''SELECT TipoVehiculo, AVG(Severidad) FROM MedianaAccidentes WHERE Codigo={}'''.format(element[0])).fetchone()
         print("*************************************************")
         print("Tipo de Vehiculo:",promedio[0],"Promedio de severidad:",promedio[1],'\n'+"Total de Accidentes",len(total_accidentes))
-        print("*************************************************")
-    
+        cursor.execute('''INSERT INTO Resultados VALUES (?,?,?)''',(promedio[0],promedio[1],len(total_accidentes)))
 
 accidentes_Tipo_Vehiculo_Severeidad(lista)
-
+instruccion=cursor.execute(''' SELECT * FROM Resultados''').fetchall()
 conexion.commit()
 cursor.close()
+
+# Conversion a dataframe  para plotear 
+df=pd.DataFrame(instruccion)
+df.columns=["Tipo de Vehiculo","Promedio de Severidad","Total de Accidentes"]
+
+# PLOTS
+fig,axes=plt.subplots(2,1,figsize=(23,10))
+sns.barplot(ax=axes[0],x="Promedio de Severidad",y="Tipo de Vehiculo",data=df,palette="tab10")
+axes[0].set_title("Promedio de Severidad - Tipo de Vehiculo")
+
+sns.barplot(ax=axes[1],x="Total de Accidentes",y="Tipo de Vehiculo",data=df,palette="tab10")
+axes[1].set_title("Total de Accidentes - Tipo de Vehiculo")
+fig.savefig('box_plot.png')
